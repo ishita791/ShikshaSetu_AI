@@ -1,0 +1,257 @@
+// LearnReach AI - Prisma Schema
+// SDG 4: Quality Education - Personalized Learning for Every Student
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model User {
+  id           String          @id @default(uuid())
+  email        String          @unique
+  passwordHash String
+  name         String
+  role         Role            @default(STUDENT)
+  avatarUrl    String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  studentProfile           StudentProfile?
+  chatSessions             ChatSession[]
+  quizAttempts             QuizAttempt[]
+  learningProgress         LearningProgress[]
+  translationHistory       TranslationHistory[]
+  
+  // Teacher-student associations
+  teacherAssignments       TeacherStudentAssignment[] @relation("TeacherRelation")
+  studentAssignments       TeacherStudentAssignment[] @relation("StudentRelation")
+
+  @@index([email])
+  @@index([role])
+}
+
+model StudentProfile {
+  id                String      @id @default(uuid())
+  userId            String      @unique
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferredLanguage String      @default("en") // 'en' | 'hi' | 'or' | 'bn'
+  learningLevel     Difficulty  @default(BEGINNER)
+  gradeLevel        String      @default("Class 8")
+  villageOrRegion   String?
+  schoolName        String?
+  dailyGoalMinutes  Int         @default(30)
+  streakDays        Int         @default(1)
+  totalPoints       Int         @default(0)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model Subject {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  description String
+  icon        String   @default("book-open")
+  grade       String   @default("Class 6-10")
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  topics   Topic[]
+  quizzes  Quiz[]
+}
+
+model Topic {
+  id          String      @id @default(uuid())
+  subjectId   String
+  subject     Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  difficulty  Difficulty  @default(BEGINNER)
+  order       Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  lessons          Lesson[]
+  quizzes          Quiz[]
+  learningProgress LearningProgress[]
+  chatSessions     ChatSession[]
+
+  @@index([subjectId])
+}
+
+model Lesson {
+  id                 String   @id @default(uuid())
+  topicId            String
+  topic              Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  title              String
+  summary            String
+  content            String
+  keyPoints          String[]
+  practicalExample   String
+  ruralContextNote   String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([topicId])
+}
+
+model ChatSession {
+  id         String     @id @default(uuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId    String?
+  topic      Topic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  subjectId  String?
+  language   String     @default("en")
+  difficulty Difficulty @default(BEGINNER)
+  title      String
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id                    String      @id @default(uuid())
+  sessionId             String
+  session               ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role                  String      // 'user' | 'assistant'
+  content               String
+  language              String      @default("en")
+  stepByStepExplanation String?
+  practicalExample      String?
+  suggestedQuestions    String[]
+  createdAt             DateTime    @default(now())
+
+  @@index([sessionId])
+}
+
+model Quiz {
+  id            String     @id @default(uuid())
+  title         String
+  subjectId     String
+  subject       Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId       String?
+  topic         Topic?     @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  difficulty    Difficulty @default(BEGINNER)
+  language      String     @default("en")
+  questionCount Int        @default(5)
+  isAiGenerated Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@index([subjectId])
+}
+
+model Question {
+  id                 String   @id @default(uuid())
+  quizId             String
+  quiz               Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  prompt             String
+  options            String[]
+  correctOptionIndex Int
+  explanation        String
+  topicConcept       String
+
+  quizAnswers QuizAnswer[]
+
+  @@index([quizId])
+}
+
+model QuizAttempt {
+  id             String   @id @default(uuid())
+  quizId         String
+  quiz           Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  score          Int
+  totalQuestions Int
+  percentage     Float
+  weakConcepts   String[]
+  recommendations String[]
+  completedAt    DateTime @default(now())
+
+  answers QuizAnswer[]
+
+  @@index([userId])
+  @@index([quizId])
+}
+
+model QuizAnswer {
+  id                 String      @id @default(uuid())
+  attemptId          String
+  attempt            QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId         String
+  question           Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionIndex Int
+  isCorrect          Boolean
+}
+
+model LearningProgress {
+  id            String         @id @default(uuid())
+  userId        String
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId       String
+  topic         Topic          @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  status        ProgressStatus @default(NOT_STARTED)
+  masteryScore  Float          @default(0) // 0 to 100
+  lastStudiedAt DateTime       @default(now())
+
+  @@unique([userId, topicId])
+  @@index([userId])
+}
+
+model TeacherStudentAssignment {
+  id          String   @id @default(uuid())
+  teacherId   String
+  teacher     User     @relation("TeacherRelation", fields: [teacherId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     User     @relation("StudentRelation", fields: [studentId], references: [id], onDelete: Cascade)
+  note        String?
+  assignedAt  DateTime @default(now())
+
+  @@unique([teacherId, studentId])
+  @@index([teacherId])
+  @@index([studentId])
+}
+
+model TranslationHistory {
+  id             String   @id @default(uuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceLanguage String
+  targetLanguage String
+  originalText   String
+  translatedText String
+  simplifiedText String?
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+}

@@ -1,0 +1,8 @@
+{
+  "name": "LearnReach AI – Personalized Learning for Every Student",
+  "description": "AI-powered personalized learning platform bridging educational gaps for rural and regional students with an adaptive tutor, multilingual translation, and performance-based quiz generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
